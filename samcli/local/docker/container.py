@@ -8,6 +8,7 @@ import threading
 
 import docker
 import requests
+from sshtunnel import SSHTunnelForwarder
 
 from docker.errors import NotFound as DockerNetworkNotFound
 from samcli.lib.utils.retry import retry
@@ -233,8 +234,17 @@ class Container:
         # TODO(sriram-mv): `aws-lambda-rie` is in a mode where the function_name is always "function"
         # NOTE(sriram-mv): There is a connection timeout set on the http call to `aws-lambda-rie`, however there is not
         # a read time out for the response received from the server.
+
+        tunnel = SSHTunnelForwarder(
+                # for circle-ci - this could be a flag or config var, it's just a hostname
+                'remote-docker',
+                remote_bind_address=('localhost', self.rapid_port_host)
+        )
+        tunnel.start()
+
+
         resp = requests.post(
-            self.URL.format(port=self.rapid_port_host, function_name="function"),
+            self.URL.format(port=tunnel.local_bind_port, function_name="function"),
             data=event,
             timeout=(self.RAPID_CONNECTION_TIMEOUT, None),
         )
